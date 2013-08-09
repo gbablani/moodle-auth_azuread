@@ -189,74 +189,88 @@
         }
     }   
 
-
-    $tok = new SAMLToken($_POST['wresult']);
-    if (isset($tok)){
-        global $_TenantThumb;
-        /* Validate the token against audience, issuer etc. If its not valid the isvalid function called below will return false*/
-
-        /* Audience is just the app id*/
-        $aud = "spn:".get_config('block_azuread','appid');
-
-        /* Ussuer has to be ACS at the company\university id */
-        $iss = STSJWTToken::URL_ISSUER."/".get_config('block_azuread','companyid')."/";
-
-        if (!isset($_TenantThumb))
-        {
-
-
-            try{
-                $dom = get_config('block_azuread','companydomain');
-                $url = STSJWTToken::URL_STSMETADATA.$dom;
-                $response = http_get($url);
-                if (isset($response)){
-                    $dom = new DOMDocument();
-                    $resparr = http_parse_message($response);
-                    if (isset($resparr) && $resparr->responseCode == 200 && isset($resparr->body)){
-
-
-                        $dom->loadXML($resparr->body);
-                        $certs = $dom->getElementsByTagName('X509Certificate');
-                        $_TenantThumb = sha1(base64_decode($certs->item(0)->textContent));
-                    }
-                }
-            }catch (Exception $ex)
-            {
-                $_TenantThumb =null;
-            }   
-        }     
-
-
-        $tok->validate($aud,$iss,$_TenantThumb);
-    }
-    /* We do some magic here. If the token is valid we make a call to the overall login function
-    for Moodle. We do this by setting a username and a fake "password" which is the AzureADSecret setup at AzureAD initalization time. The AzureAD
-    user_login user always checks for the password to be the AzurADSecret and logs a user in if it is. If the token is 
-    invalid we just send userback to home page 
-    */
-    if ($tok->isvalid())
-    {
-        global $_AzureADSecret;
-
-        $objid = $tok->getClaim(SAMLToken::CLAIM_OBJECTID);
-        if (isset($objid))    
-            $u = authenticate_user_login($objid,$_AzureADSecret);
-        if ($u != false){
-            //Complete the login and send user back to the page they stated from
-            complete_user_login($u);
-            $SESSION->aaduser = $_POST['wresult'];
-            $SESSION->aadusername = $tok->getDisplayNameClaim();        
-
+    function _ishttpinstalled() {
+        if  (in_array  ('http', get_loaded_extensions())) {
+            return true;
+        }
+        else{
+            return false;
         }
     }
-    /* In all cases success or failure send user back to page they came from */
-    if (!empty($SESSION->wantsurl)) {
-        $go = $SESSION->wantsurl;
-        unset($SESSION->wantsurl);
+    if (!_ishttpinstalled())
+    {
+        echo ("PHP Extension Http is required for this plugin. Please install the php_http extension for PHP");
+    }else{
+    
+
+        $tok = new SAMLToken($_POST['wresult']);
+        if (isset($tok)){
+            global $_TenantThumb;
+            /* Validate the token against audience, issuer etc. If its not valid the isvalid function called below will return false*/
+
+            /* Audience is just the app id*/
+            $aud = "spn:".get_config('block_azuread','appid');
+
+            /* Ussuer has to be ACS at the company\university id */
+            $iss = STSJWTToken::URL_ISSUER."/".get_config('block_azuread','companyid')."/";
+
+            if (!isset($_TenantThumb))
+            {
+
+
+                try{
+                    $dom = get_config('block_azuread','companydomain');
+                    $url = STSJWTToken::URL_STSMETADATA;
+                    $url=str_ireplace("%1",$dom,$url);
+                    $response = http_get($url);
+                    if (isset($response)){
+                        $dom = new DOMDocument();
+                        $resparr = http_parse_message($response);
+                        if (isset($resparr) && $resparr->responseCode == 200 && isset($resparr->body)){
+
+
+                            $dom->loadXML($resparr->body);
+                            $certs = $dom->getElementsByTagName('X509Certificate');
+                            $_TenantThumb = sha1(base64_decode($certs->item(0)->textContent));
+                        }
+                    }
+                }catch (Exception $ex)
+                {
+                    $_TenantThumb =null;
+                }   
+            }     
+
+
+            $tok->validate($aud,$iss,$_TenantThumb);
+        }
+        /* We do some magic here. If the token is valid we make a call to the overall login function
+        for Moodle. We do this by setting a username and a fake "password" which is the AzureADSecret setup at AzureAD initalization time. The AzureAD
+        user_login user always checks for the password to be the AzurADSecret and logs a user in if it is. If the token is 
+        invalid we just send userback to home page 
+        */
+        if ($tok->isvalid())
+        {
+            global $_AzureADSecret;
+
+            $objid = $tok->getClaim(SAMLToken::CLAIM_OBJECTID);
+            if (isset($objid))    
+                $u = authenticate_user_login($objid,$_AzureADSecret);
+            if ($u != false){
+                //Complete the login and send user back to the page they stated from
+                complete_user_login($u);
+                $SESSION->aaduser = $_POST['wresult'];
+                $SESSION->aadusername = $tok->getDisplayNameClaim();        
+
+            }
+        }
+        /* In all cases success or failure send user back to page they came from */
+        if (!empty($SESSION->wantsurl)) {
+            $go = $SESSION->wantsurl;
+            unset($SESSION->wantsurl);
+        }
+        if (!isset($go))
+            $go = $CFG->wwwroot;
+
+        redirect($go);
     }
-    if (!isset($go))
-        $go = $CFG->wwwroot;
-
-    redirect($go);
-
 ?>

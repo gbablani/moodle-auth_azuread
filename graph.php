@@ -184,7 +184,7 @@
         //Constants for audience - audience is the graph object 
         const URL_STS = "https://login.windows.net/%1/oauth2/token?api-version=1.0";
         const URL_ISSUER = "https://sts.windows.net";
-        const URL_STSMETADATA = "https://accounts.accesscontrol.windows.net/FederationMetadata/2007-06/FederationMetadata.xml?realm=";
+        const URL_STSMETADATA = "https://login.windows.net/%1/2007-06/FederationMetadata.xml";
         const NAME_GRAPHRESOURCE = "https://graph.windows.net";
         const FIELD_CLAIMTYPE = "grant_type";
         const VALUE_CLAIMTYPE = "client_credentials";
